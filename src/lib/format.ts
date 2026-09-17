@@ -10,10 +10,18 @@
 
 import type { Platform } from "./types";
 
-/* ── Affiliate tracking pipeline ─────────────────────────────────────── */
+/* ── Affiliate tracking pipeline (Ecomobi Dynamic Link — goeco.mobi) ─── */
 
-/** Query parameter Ecomobi uses for channel-level Sub-ID attribution. */
-export const SUB_ID_PARAM = "sub_id";
+/**
+ * Query parameter Ecomobi's Dynamic Link service uses for channel-level
+ * Sub-ID attribution. The dashboard's Sub-ID field is sent as this parameter
+ * and appears as `sub1` in Ecomobi conversion reports.
+ */
+export const SUB_ID_PARAM = "sub1";
+
+/** Human-readable explanation shown next to Sub-ID inputs. */
+export const SUB_ID_PARAM_NOTE =
+  "Sub-IDs are recorded as sub1 in your Ecomobi conversion reports.";
 
 export const SUB_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
@@ -28,23 +36,16 @@ export function validateSubId(value: string): string | null {
 }
 
 /**
- * Append (or replace) the Sub-ID on an Ecomobi tracking link.
- * Uses the URL API so existing campaign parameters are preserved exactly.
+ * Build an /api/go proxy URL that routes a product URL through the Ecomobi
+ * tracking pipeline server-side (token never appears in public HTML).
+ * Used by the pre-rendered trending grid's outbound deal links.
  */
-export function buildAffiliateLink(productUrl: string, subId: string | null): string {
-  if (!productUrl) return "";
-  const value = (subId ?? "").trim();
-  try {
-    const url = new URL(productUrl);
-    if (value) url.searchParams.set(SUB_ID_PARAM, value);
-    else url.searchParams.delete(SUB_ID_PARAM);
-    return url.toString();
-  } catch {
-    // Extremely defensive path for malformed upstream links.
-    if (!value) return productUrl;
-    const separator = productUrl.includes("?") ? "&" : "?";
-    return `${productUrl}${separator}${SUB_ID_PARAM}=${encodeURIComponent(value)}`;
-  }
+export function buildTrackedProxyHref(
+  productUrl: string,
+  channel: string,
+): string {
+  const params = new URLSearchParams({ url: productUrl, sub1: channel });
+  return `/api/go?${params.toString()}`;
 }
 
 /* ── Platform presentation ───────────────────────────────────────────── */

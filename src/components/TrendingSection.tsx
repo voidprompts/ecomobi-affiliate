@@ -25,7 +25,7 @@ import {
 } from "@/lib/trending-products";
 import {
   PLATFORM_LABELS,
-  buildAffiliateLink,
+  buildTrackedProxyHref,
   discountPercent,
   formatPrice,
   formatSold,
@@ -44,12 +44,13 @@ const itemListJsonLd = {
     "@type": "ListItem",
     position: index + 1,
     name: product.title,
-    url: buildAffiliateLink(product.product_url, DEFAULT_TRENDING_SUB_ID),
+    url: buildTrackedProxyHref(product.product_url, DEFAULT_TRENDING_SUB_ID),
   })),
 };
 
 function TrendingCard({ product, index }: { product: Product; index: number }) {
-  const href = buildAffiliateLink(product.product_url, DEFAULT_TRENDING_SUB_ID);
+  // Routed through /api/go → goeco.mobi tracking pipeline (token server-side).
+  const href = buildTrackedProxyHref(product.product_url, DEFAULT_TRENDING_SUB_ID);
   const discount = discountPercent(product.price, product.original_price);
   const label = PLATFORM_LABELS[product.platform];
   const ctaLabel = label === "Partner Store" ? "View Deal" : `View Deal on ${label}`;

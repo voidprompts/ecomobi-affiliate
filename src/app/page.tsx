@@ -22,6 +22,7 @@
 
 import type { Metadata } from "next";
 import SearchDashboard from "@/components/SearchDashboard";
+import LinkGenerator from "@/components/LinkGenerator";
 import TrendingSection from "@/components/TrendingSection";
 import { BoltIcon, LinkIcon, SearchIcon, SparkIcon, TagIcon } from "@/components/ui";
 import { SITE_URL } from "@/lib/site";
@@ -115,20 +116,20 @@ const WORKFLOW_STEPS = [
   {
     step: "01",
     icon: "search",
-    title: "Search live catalogs",
-    text: "Query up-to-date listings from Shopee, Lazada and TikTok Shop through the Ecomobi Publisher API — real-time prices, store names, ratings, sales and commission rates.",
+    title: "Find the product",
+    text: "Browse the trending deals grid or paste any product URL from Shopee PH, Lazada PH and your other approved Ecomobi campaign stores.",
   },
   {
     step: "02",
     icon: "tag",
     title: "Generate a tracked link",
-    text: "Tag the product with your Sub-ID channel label — fb-reels, tiktok-bio, youtube-07 — and the dashboard appends it to the Ecomobi tracking pipeline in one click.",
+    text: "The dashboard routes the URL through the Ecomobi Dynamic Link service (goeco.mobi) with your channel Sub-ID attached — fb-reels, tiktok-bio, youtube-07 — in one click.",
   },
   {
     step: "03",
     icon: "bolt",
     title: "Share and earn commissions",
-    text: "Publish your affiliate links anywhere. Every click, order and commission is attributed to the exact channel inside your Ecomobi publisher reports.",
+    text: "Publish your affiliate links anywhere. Shoppers land on the store with your publisher tracking attached, and every order is credited in your Ecomobi conversion reports.",
   },
 ] as const;
 
@@ -179,6 +180,12 @@ export default function HomePage() {
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
             >
               Search
+            </a>
+            <a
+              href="#generator"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+            >
+              Link Generator
             </a>
             <a
               href="#trending"
@@ -240,6 +247,29 @@ export default function HomePage() {
         {/* Interactive search island (client component, hydrated on load) */}
         <SearchDashboard />
 
+        {/* Instant link generator — the real Ecomobi Dynamic Link pipeline */}
+        <section
+          id="generator"
+          aria-labelledby="generator-heading"
+          className="scroll-mt-20 pt-12 sm:pt-16"
+        >
+          <header className="mb-5 max-w-2xl">
+            <h2
+              id="generator-heading"
+              className="text-xl font-bold tracking-tight text-white sm:text-2xl"
+            >
+              Instant affiliate link generator
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              Paste any product URL from an approved store — Shopee PH, Lazada PH and your
+              other Ecomobi campaigns — and get a ready-to-share tracked affiliate link
+              through the Ecomobi Dynamic Link service, tagged to your chosen Sub-ID
+              channel.
+            </p>
+          </header>
+          <LinkGenerator />
+        </section>
+
         {/* Pre-rendered trending products — fully crawlable, zero-JS grid */}
         <TrendingSection />
 
@@ -280,6 +310,9 @@ export default function HomePage() {
           <nav aria-label="Footer" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-medium text-slate-400">
             <a href="#search" className="transition hover:text-white">
               Product search
+            </a>
+            <a href="#generator" className="transition hover:text-white">
+              Link generator
             </a>
             <a href="#trending" className="transition hover:text-white">
               Trending products

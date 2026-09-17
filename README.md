@@ -1,119 +1,59 @@
-# Ecomobi Affiliate Dashboard — Programmatic SEO Edition
+# Ecomobi Affiliate Dashboard — Live API Edition
 
 Production-ready **E-Commerce Search & Affiliate Dashboard** built with
-**Next.js 14 (App Router)** and **Tailwind CSS**, re-architected for
-**programmatic SEO**, **web crawlers** and **Core Web Vitals**. Deploys to
-**Vercel with zero configuration**.
+**Next.js 14 (App Router)** and **Tailwind CSS**, integrated with the **real
+Ecomobi publisher API** (verified against the official documentation at
+`affiliate.passio.eco/pub-api-document`). Deploys to **Vercel with zero
+configuration**.
 
-Search live product data from **Shopee, Lazada and TikTok Shop** through the
-Ecomobi Publisher API, generate Sub-ID-tracked affiliate links in one click —
-and let Google index every price, store and outbound deal link **without
-executing a single line of JavaScript**.
+## What actually works — live-verified
 
----
+| Feature | Status | How |
+|---|---|---|
+| **Instant Link Generator** | ✅ LIVE | Paste any product URL from an approved store → real `goeco.mobi` tracked affiliate link with your Sub-ID channel (`sub1`), validated through the Ecomobi Dynamic Link service |
+| **Campaign list** | ✅ LIVE | All **78 approved advertisers** from your account (Lazada PH 9.6%, Shopee PH 3.2%, Adidas PH, Shein 12%, …) with commission rates |
+| **Tracked trending grid** | ✅ LIVE | Every "View Deal" click routes through `/api/go` → `goeco.mobi` with server-side token injection and the `web-trending` channel Sub-ID |
+| **Product search** | ⚠️ Sample data | Ecomobi's public API has **no product-search catalog** (the `/api/v3/products` endpoint exists but returns an empty dataset until product feeds are enabled for your campaigns). The search UI serves a clearly-labeled sample catalog and live-empty results include guidance to the generator |
+| **Conversions reporting** | 🔜 Roadmap | The documented `/api/v3/conversions` endpoint (token_private, ≤90-day ranges) is available but intentionally not exposed in the UI |
 
-## SEO & performance architecture
-
-The app is split into a **statically pre-rendered server shell** (crawler
-heaven, zero JS) and a **hydrated client island** (the interactive search):
-
-```
-src/app/page.tsx                ○ SSG server component
-├── export const metadata       → Title / Description / OG / Twitter / canonical
-├── JSON-LD (WebSite + SearchAction)
-├── <header> <nav>              → brand + section navigation
-├── <main>
-│   ├── <section> hero          → single keyword-rich <h1>
-│   ├── <SearchDashboard/>      → CLIENT island: form, live grid, link modal
-│   ├── <TrendingSection/>      → SERVER: "Trending Products in the Philippines"
-│   │                             10 × <article> grid, 20 × rel="sponsored"
-│   │                             outbound Ecomobi links, ItemList JSON-LD —
-│   │                             all baked into static HTML at build time
-│   └── <section> how-it-works  → h2 + 3 × <article> with h3 steps
-└── <footer>                    → internal links + affiliate disclosure
-```
-
-**Why this matters for Googlebot:** the trending grid, hero copy, headings and
-outbound affiliate structures are compiled into the static HTML payload
-(~120 KB, CDN-cached for a year). Crawlers index the full product content
-instantly; users get FCP/LCP at the floor of what the network allows.
-
-### Verified crawlability (raw-HTML checks, no JS execution)
-
-| Check | Result |
-|---|---|
-| `<h1>` count | exactly 1 — "Search, compare & monetize products from Shopee, Lazada & TikTok Shop" |
-| Heading cascade | 3 × `<h2>` (search / trending / how-it-works) → 13 × `<h3>` (product + step titles) |
-| Landmarks | `<header>`, `<main>`, `<footer>`, `<nav>`, `<article>` (13), `aria-labelledby` (7) |
-| Images | 10/10 `<img>` tags carry descriptive `alt` text ("… — Shopee product photo") |
-| Pre-rendered content | all 10 trending products: titles, ₱ prices, stores, ratings, commissions |
-| Outbound affiliate links | 20 × `rel="sponsored noopener noreferrer"` (Google's affiliate-link annotation) |
-| Meta description | exact target string, 106 chars |
-| OpenGraph / Twitter | full tag set + 1200×630 `og.png` |
-| Structured data | WebSite + SearchAction + ItemList (10 items) JSON-LD |
-| Crawlable internal links | 6 popular-search chips as real `/?keyword=…` anchors + footer nav |
-| `robots.txt` / `sitemap.xml` | auto-generated (App Router Metadata Routes) |
-
-### Core Web Vitals design decisions
-
-- **○ (Static) pre-rendering** — the shell is served from the CDN edge
-  (`Cache-Control: s-maxage=31536000, stale-while-revalidate`).
-- **Client JS reduced** — moving static content to the server cut the page
-  chunk from 8.9 kB to 6.8 kB; total First Load JS ≈ 94 kB with **zero
-  runtime dependencies** beyond React.
-- **Zero web-font downloads** — system-ui font stack eliminates font-induced
-  CLS and LCP delay (critical on PH mobile networks).
-- **Intrinsic `width`/`height` on every image** — no layout shift, ever.
-- **`loading="lazy"` + `decoding="async"`** on below-fold images; the first
-  two trending thumbnails load eagerly to protect LCP.
-- **No third-party scripts** — no analytics/CDN blocking paints out of the box.
-- On Vercel this stack benchmarks at FCP/LCP well under the 1.5 s target for
-  mobile visitors from Philippine edge locations; verify your deployment at
-  [PageSpeed Insights](https://pagespeed.web.dev/).
-
-### Programmatic search landing URLs
-
-The dashboard reads `?keyword=` / `?q=` and `?sub_id=` on load and runs the
-search automatically, and every search mirrors its state back to the address
-bar via `history.replaceState`. That makes every URL like
-`/?keyword=wireless+earbuds` a **shareable, crawlable landing page**, and the
-popular-search chips + sitemap expose the highest-value ones to crawlers.
+**Verified live behavior:** `shopee.ph/product/…` → `s.shopee.ph/an_redir?…affiliate_id=13248560000…`,
+`lazada.com.ph/…` → `c.lazada.com.ph/t/…`, unsupported stores and inactive
+campaigns return friendly, actionable errors.
 
 ---
 
-## File structure
+## Architecture
 
 ```
-ecomobi-dashboard/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx                     # SERVER shell: metadata, JSON-LD, hero,
-│   │   │                                #   trending + how-it-works sections
-│   │   ├── layout.tsx                   # Root layout, metadataBase, title template
-│   │   ├── globals.css                  # Tailwind base + components
-│   │   ├── icon.svg                     # Favicon
-│   │   ├── robots.ts                    # → /robots.txt (allows /, disallows /api/)
-│   │   ├── sitemap.ts                   # → /sitemap.xml (root + keyword landing URLs)
-│   │   └── api/search/route.ts          # Secure Ecomobi backend (GET + POST)
-│   ├── components/
-│   │   ├── SearchDashboard.tsx          # CLIENT island: search form, results grid,
-│   │   │                                #   filters, link modal, URL deep-linking
-│   │   ├── TrendingSection.tsx          # SERVER: pre-rendered trending grid + ItemList
-│   │   └── ui.tsx                       # Shared icons + platform badge (dual-safe)
-│   └── lib/
-│       ├── types.ts                     # Shared Product contract (API ↔ UI)
-│       ├── format.ts                    # Price/link/format helpers + platform meta
-│       ├── site.ts                      # Canonical URL resolution (Vercel-aware)
-│       └── trending-products.ts         # Static PH trending dataset + demo catalog
-├── public/
-│   ├── og.png                           # 1200×630 OpenGraph social image
-│   └── demo/                            # Sample product art (demo mode)
-├── .env.local                           # Environment token definitions
-├── .env.example
-├── next.config.mjs                      # Security headers, no poweredBy
-├── tailwind.config.ts / postcss.config.js / tsconfig.json
-└── package.json
+src/app/page.tsx                    ○ SSG server shell — metadata, JSON-LD, hero,
+│                                     generator section, trending grid, how-it-works
+├── src/components/
+│   ├── SearchDashboard.tsx         CLIENT island — search form, results grid,
+│   │                                 modal (real link generation via /api/link)
+│   ├── LinkGenerator.tsx           CLIENT — the real core: paste URL → tracked link
+│   │                                 + live campaign chips from /api/advertisers
+│   ├── TrendingSection.tsx         SERVER — pre-rendered grid, links via /api/go
+│   └── ui.tsx                      Shared icons + platform badges
+├── src/app/api/
+│   ├── link/route.ts               POST → real goeco.mobi Dynamic Link generation
+│   ├── go/route.ts                 GET → 302 tracked redirect (token server-side)
+│   ├── advertisers/route.ts        GET → live campaign list (1h cache)
+│   └── search/route.ts             POST/GET → product search (live or demo)
+└── src/lib/
+    ├── tracking.ts                 SERVER-ONLY goeco.mobi helpers + error mapping
+    ├── types.ts / format.ts / site.ts / trending-products.ts
 ```
+
+**Security model:** the public `Token` lives only in server environment
+variables. It is injected into `goeco.mobi` URLs by `/api/link` and `/api/go`
+server-side and never appears in the page HTML. The **Token Private** is not
+used by the app at all — it is for the conversions reporting endpoint only and
+must never be exposed to any browser-facing code.
+
+**SEO:** statically pre-rendered shell (single h1, h2→h3 cascade, 13 `<article>`
+elements, descriptive alt text on every image, ItemList + WebSite +
+SearchAction JSON-LD, canonical/OpenGraph/Twitter metadata, `robots.txt`,
+`sitemap.xml`, 1200×630 OG image) — all crawler-visible with zero JavaScript.
 
 ---
 
@@ -121,16 +61,16 @@ ecomobi-dashboard/
 
 ```bash
 npm install
-npm run dev          # → http://localhost:3000 (demo mode, no token needed)
+npm run dev        # → http://localhost:3000 (demo mode, no token needed)
 ```
 
-Add your token to `.env.local` for live data:
+For live data, set your token (Passio dashboard → API Settings → copy the
+public **Token**, not the Token Private):
 
+```bash
+# .env.local (local)  — or Vercel → Settings → Environment Variables (production)
+ECOMOBI_API_TOKEN=your_public_token_here
 ```
-ECOMOBI_API_TOKEN=your_publisher_api_token
-```
-
-Production build (outputs the statically pre-rendered shell):
 
 ```bash
 npm run build && npm start
@@ -142,100 +82,86 @@ npm run build && npm start
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `ECOMOBI_API_TOKEN` | ✅ | — | Publisher API token (Passio dashboard → API Settings) |
-| `ECOMOBI_API_BASE_URL` | — | `https://api.ecomobi.com` | Ecomobi API host |
-| `ECOMOBI_SEARCH_ENDPOINT` | — | `/v3/products/search` | Product-search path |
-| `ECOMOBI_AUTH_SCHEME` | — | `bearer` | `bearer` or `apikey` header style |
-| `DEMO_MODE` | — | `auto` | `auto` / `true` / `false` sample-data behavior |
+| `ECOMOBI_API_TOKEN` | ✅ | — | Public publisher Token (Passio → API Settings). NOT the Token Private |
+| `ECOMOBI_API_BASE_URL` | — | `https://api.ecotrackings.com` | Ecomobi/Passio API host (verified) |
+| `ECOMOBI_SEARCH_ENDPOINT` | — | `/api/v3/products` | Product endpoint (verified; empty until feeds are enabled) |
+| `ECOMOBI_LINK_BASE` | — | `https://goeco.mobi` | Ecomobi Dynamic Link service (verified) |
+| `ECOMOBI_AUTH_SCHEME` | — | `query` | Token transport for the product endpoint: `query` / `bearer` / `apikey` |
+| `ECOMOBI_TOKEN_PARAM` | — | `token` | Query-param name when auth scheme is `query` |
+| `DEMO_MODE` | — | `auto` | `auto` (demo only without token) / `true` / `false` |
 | `NEXT_PUBLIC_CURRENCY_SYMBOL` | — | `₱` | Price symbol in the UI |
-| `NEXT_PUBLIC_SITE_URL` | — | auto | Canonical/sitemap/OG base URL — **auto-detected on Vercel** |
-| `RATE_LIMIT_MAX` | — | `30` | Searches per window per IP |
-| `RATE_LIMIT_WINDOW_MS` | — | `60000` | Rate-limit window (ms) |
-
-`NEXT_PUBLIC_SITE_URL` resolution order: explicit value → Vercel production
-URL (`VERCEL_PROJECT_PRODUCTION_URL`) → `http://localhost:3000`. Set it only
-when serving from a custom domain outside Vercel.
+| `NEXT_PUBLIC_SITE_URL` | — | auto | Canonical/sitemap/OG base URL — auto-detected on Vercel |
+| `RATE_LIMIT_MAX` | — | `30` | Requests per window per IP (search + link routes) |
 
 ---
 
-## API reference — `/api/search`
+## API reference
 
-### POST (used by the UI)
+### `POST /api/link` — generate a tracked affiliate link
 
 ```bash
-curl -X POST http://localhost:3000/api/search \
+curl -X POST https://your-app.vercel.app/api/link \
   -H "Content-Type: application/json" \
-  -d '{"keyword":"wireless earbuds","subId":"fb-reels","limit":24}'
+  -d '{"url":"https://shopee.ph/product/123/456","subId":"fb-reels"}'
 ```
-
-### GET (quick tests / integrations)
-
-```
-http://localhost:3000/api/search?keyword=air%20fryer&subId=tiktok-bio
-```
-
-### Success envelope
 
 ```json
 {
   "ok": true,
-  "source": "ecomobi",
-  "keyword": "wireless earbuds",
-  "sub_id": "fb-reels",
-  "page": 1,
-  "limit": 24,
-  "count": 2,
-  "products": [
-    {
-      "id": "SP-882312",
-      "title": "JBL Tune 520BT Wireless On-Ear Headphones",
-      "price": 2899,
-      "original_price": 3999,
-      "currency": "PHP",
-      "store_name": "Shopee · JBL Official Store",
-      "platform": "shopee",
-      "image_url": "https://…/thumb.jpg",
-      "product_url": "https://go.ecomobi.com/ph/shopee/offer?product_id=…",
-      "commission_rate": 4.5,
-      "rating": 4.8,
-      "sold": 12400
-    }
-  ]
+  "link": "https://goeco.mobi/?token=…&url=https%3A%2F%2Fshopee.ph%2F…&sub1=fb-reels",
+  "resolved": "https://s.shopee.ph/an_redir?origin_link=…&affiliate_id=…",
+  "channel": "fb-reels"
 }
 ```
 
-### Error envelope & codes
+`link` is the ready-to-share tracked URL; `resolved` is the final merchant
+affiliate URL it 302-redirects to (useful as a sanity preview). Error codes:
+`LINK_INVALID_URL`, `LINK_STORE_NOT_SUPPORTED` (store not in your campaigns),
+`LINK_CAMPAIGN_NOT_RUNNING`, `LINK_AUTH_FAILED`, `LINK_FORBIDDEN`,
+`LINK_TIMEOUT`, `LINK_UPSTREAM_ERROR`, `RATE_LIMITED`.
 
-```json
-{ "ok": false, "error": { "code": "VALIDATION_ERROR", "message": "…" } }
+### `GET /api/go?url=…&sub1=…` — tracked outbound redirect
+
+Used by the pre-rendered trending grid. Validates the URL, injects the
+server-side token, and 302-redirects the shopper through `goeco.mobi`. The
+token never appears in the public HTML.
+
+### `GET /api/advertisers` — live campaign list
+
+Proxies `GET https://api.ecotrackings.com/api/v3/advertisers?token=…&limit=100`,
+strips HTML from rich-text fields, caches for one hour, and returns
+`{ ok, count, advertisers: [{ id, name, country, currency, category, commission, homepage, cookie_rule }] }`.
+
+### `POST|GET /api/search` — product search
+
+```bash
+curl -X POST https://your-app.vercel.app/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"keyword":"wireless earbuds","subId":"fb-reels","limit":24}'
 ```
 
-| `code` | HTTP | Meaning |
+Success: `{ ok: true, source, keyword, sub_id, count, products: [...] }` with
+the uniform product schema (`title`, `price`, `store_name`, `image_url`,
+`product_url`, `platform`, `commission_rate`, `rating`, `sold`). Errors use
+`{ ok: false, error: { code, message } }` with codes `VALIDATION_ERROR`,
+`RATE_LIMITED`, `CONFIG_ERROR`, `ECOMOBI_AUTH_FAILED`,
+`ECOMOBI_ENDPOINT_NOT_FOUND`, `ECOMOBI_TIMEOUT`, `ECOMOBI_NETWORK_ERROR`,
+`INTERNAL_ERROR`.
+
+> **Note:** with a valid token the search hits the real
+> `api.ecotrackings.com/api/v3/products` endpoint, which currently returns an
+> empty catalog for accounts without product feeds — the UI shows a helpful
+> notice pointing to the Instant Link Generator in that case. Without a token
+> (`DEMO_MODE=auto`), a clearly-labeled sample catalog is served so the UI
+> stays fully explorable.
+
+### The upstream contract (from the official docs)
+
+| Endpoint | Auth | Notes |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | Bad input (keyword/subId/limit/page) |
-| `RATE_LIMITED` | 429 | Too many searches from this client |
-| `CONFIG_ERROR` | 503 | No token set and `DEMO_MODE=false` |
-| `ECOMOBI_AUTH_FAILED` | 502 | Token rejected by Ecomobi (401/403) |
-| `ECOMOBI_ENDPOINT_NOT_FOUND` | 502 | Wrong `ECOMOBI_SEARCH_ENDPOINT` (404) |
-| `ECOMOBI_BAD_REQUEST` | 502 | Upstream rejected the query shape |
-| `ECOMOBI_RATE_LIMITED` | 429 | Upstream rate limit |
-| `ECOMOBI_TIMEOUT` | 504 | Upstream exceeded 12 s |
-| `ECOMOBI_NETWORK_ERROR` | 502 | Could not reach the API host |
-| `INTERNAL_ERROR` | 500 | Unexpected server fault |
-
-The backend authenticates with `process.env.ECOMOBI_API_TOKEN` server-side
-only, tries POST then GET against the endpoint, enforces a 12 s timeout, and
-normalizes many Ecomobi payload shapes (`products`/`items`/`data` containers,
-`name`/`product_name`, `deeplink`/`url`, fractional commissions, …) into the
-uniform schema above. Your token never reaches the browser.
-
-### Link generation
-
-`product_url` is the primary Ecomobi product reference link. **Generate Link**
-appends your channel label as `sub_id` (preserving existing campaign
-parameters) to produce the shareable tracked URL. The pre-rendered trending
-links carry the `web-trending` channel Sub-ID so organic-grid conversions are
-attributed separately in your Ecomobi reports.
+| `GET api.ecotrackings.com/api/v3/conversions` | `token_private` | Earnings report; date range ≤ 90 days; fields include `sub1`–`sub4`, payouts, `item_list` |
+| `GET api.ecotrackings.com/api/v3/advertisers` | `token` | Campaign list with commission, cookie rules |
+| `GET goeco.mobi/?token=…&url=…&sub1=…` | `token` | Dynamic Link — the constructed URL is the shareable tracked link; errors return as `302 → /error?err_code=…` (`empty_url`, `empty_advertiser`, `campaign_not_running`, `publisher_not_found`, …) |
 
 ---
 
@@ -243,35 +169,33 @@ attributed separately in your Ecomobi reports.
 
 1. Push the repo to GitHub/GitLab/Bitbucket.
 2. **Vercel → Add New → Project → Import** (Next.js preset auto-detected).
-3. Add `ECOMOBI_API_TOKEN` for Production/Preview (everything else is
-   optional — the site URL is auto-detected).
-4. **Deploy.** `/`, `/robots.txt`, `/sitemap.xml` and `/og.png` are served
-   from the edge as static assets; `/api/search` runs as a serverless
-   function.
+3. Add `ECOMOBI_API_TOKEN` (the public Token) for Production/Preview.
+4. **Deploy.** The static shell, `robots.txt`, `sitemap.xml` and `og.png` are
+   served from the edge; the four API routes run as serverless functions.
 
 ---
 
-## Going further (programmatic SEO roadmap)
+## Roadmap
 
-- **Keyword landing pages**: add `src/app/search/[keyword]/page.tsx` with
-  `generateMetadata` + build-time product fetches from Ecomobi to scale to
-  thousands of indexed pages (the normalizer in `route.ts` already returns
-  everything you need).
-- **Live trending data**: replace `TRENDING_PRODUCTS` in
-  `src/lib/trending-products.ts` with an incremental revalidation fetch
-  (`export const revalidate = 3600`) against your Ecomobi campaigns endpoint.
-- **Global rate limiting**: front `/api/search` with Upstash Ratelimit if you
-  expect abusive traffic; the built-in per-instance limiter is a safety net.
-- **Search Console**: submit `https://your-domain/sitemap.xml` after your
-  first deploy.
+- **Earnings tab**: add a `/api/conversions` route using `token_private`
+  (server-side only) to render payout dashboards from the documented
+  conversions endpoint (≤90-day windows).
+- **TikTok Shop**: your account has a `tiktok.sharinglink.ph` campaign —
+  currently `campaign_not_running` for dynamic links; the UI already maps that
+  to a friendly error and will work the moment Ecomobi activates it.
+- **Product feeds**: if Ecomobi enables `/api/v3/products` data for your
+  campaigns, live search results flow through the normalizer automatically.
+- **Scale SEO**: add `/search/[keyword]` landing pages via
+  `generateMetadata` + ISR.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| "Demo mode" banner with token set | Check `DEMO_MODE` isn't `true`; restart after editing `.env.local` |
-| `ECOMOBI_AUTH_FAILED` | Regenerate the API key in your Passio dashboard and update the token |
-| `ECOMOBI_ENDPOINT_NOT_FOUND` | Set `ECOMOBI_SEARCH_ENDPOINT` to the exact path from your API docs |
+| "Demo mode" banner with token set | Check `DEMO_MODE` isn't `true`; restart after editing `.env.local`; redeploy after changing Vercel env vars |
+| `LINK_AUTH_FAILED` / "Token's Wrong" | Re-copy the exact **public Token** (not Token Private) from Passio → API Settings — watch for lookalike characters (`l`/`1`/`I`, `0`/`O`) |
+| `LINK_STORE_NOT_SUPPORTED` | That store isn't in your campaign list — check the campaign chips in the generator (from `/api/advertisers`) |
+| `LINK_CAMPAIGN_NOT_RUNNING` | The store's campaign exists but isn't active for dynamic links (e.g. TikTok Linkshare PH currently) — check the campaign in your Passio dashboard |
+| `ECOMOBI_NETWORK_ERROR` | `ECOMOBI_API_BASE_URL` must be `https://api.ecotrackings.com` (the default) — `api.ecomobi.com` does not exist |
+| Search returns 0 products with a valid token | Expected until Ecomobi enables product feeds for your campaigns — use the Instant Link Generator |
 | Canonical/OG point at localhost | Set `NEXT_PUBLIC_SITE_URL` (Vercel auto-detects otherwise) |
-| Empty results for valid keywords | Try `ECOMOBI_AUTH_SCHEME=apikey`; confirm campaigns are approved |
-| Images not loading | Merchant CDNs occasionally block hotlinks — the UI swaps in a fallback automatically |

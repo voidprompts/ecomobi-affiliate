@@ -9,16 +9,23 @@
  * outbound Ecomobi affiliate links without executing a single line of
  * JavaScript.
  *
- * In production, replace this static array with a build-time fetch from your
- * Ecomobi campaigns endpoint (see README → "Going further").
+ * LINK STRATEGY (verified against the live Ecomobi Dynamic Link service):
+ *   • product_url values point at REAL marketplace pages on domains approved
+ *     in the publisher's Ecomobi campaign list (shopee.ph, lazada.com.ph) —
+ *     the trending grid routes them through /api/go, which injects the
+ *     server-side token into the goeco.mobi tracking pipeline. Every
+ *     "View Deal" click is a genuinely tracked affiliate click.
+ *   • Titles/prices are sample data (Ecomobi's public API has no product
+ *     search endpoint yet — see README); each link lands on the real
+ *     marketplace search page for that product category.
  ******************************************************************************/
 
 import type { Product } from "./types";
 
 /**
- * Default Sub-ID channel tag applied to the pre-rendered outbound deal links,
- * so conversions from organic traffic on the trending grid are attributed to
- * a distinct channel ("web-trending") inside your Ecomobi reports.
+ * Channel Sub-ID applied to pre-rendered outbound deal links, so conversions
+ * from organic traffic on the trending grid are attributed to a distinct
+ * channel ("web-trending") inside Ecomobi conversion reports (sub1 field).
  */
 export const DEFAULT_TRENDING_SUB_ID = "web-trending";
 
@@ -33,8 +40,8 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "Shopee · JBL Official Store",
     platform: "shopee",
     image_url: "/demo/headphones.svg",
-    product_url: "https://go.ecomobi.com/ph/shopee/offer?product_id=SP-882312&campaign_id=ecm-ph-2201",
-    commission_rate: 4.5,
+    product_url: "https://shopee.ph/search?keyword=JBL%20Tune%20520BT%20wireless%20headphones",
+    commission_rate: 3.2,
     rating: 4.8,
     sold: 12400,
   },
@@ -47,8 +54,8 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "Lazada · Xiaomi Official Store",
     platform: "lazada",
     image_url: "/demo/earbuds.svg",
-    product_url: "https://go.ecomobi.com/ph/lazada/offer?product_id=LZ-551207&campaign_id=ecm-ph-1907",
-    commission_rate: 3.2,
+    product_url: "https://www.lazada.com.ph/catalog/?q=Xiaomi%20Redmi%20Buds%204%20Active",
+    commission_rate: 9.6,
     rating: 4.7,
     sold: 28300,
   },
@@ -61,8 +68,8 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "Shopee · Anker Official",
     platform: "shopee",
     image_url: "/demo/powerbank.svg",
-    product_url: "https://go.ecomobi.com/ph/shopee/offer?product_id=SP-310488&campaign_id=ecm-ph-2201",
-    commission_rate: 5.0,
+    product_url: "https://shopee.ph/search?keyword=Anker%20PowerCore%2010000%20power%20bank",
+    commission_rate: 3.2,
     rating: 4.9,
     sold: 8900,
   },
@@ -75,22 +82,22 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "LazMall · Samsung Official Store",
     platform: "lazada",
     image_url: "/demo/smartphone.svg",
-    product_url: "https://go.ecomobi.com/ph/lazada/offer?product_id=LZ-774519&campaign_id=ecm-ph-1907",
-    commission_rate: 1.8,
+    product_url: "https://www.lazada.com.ph/catalog/?q=Samsung%20Galaxy%20A15%205G",
+    commission_rate: 9.6,
     rating: 4.6,
     sold: 5400,
   },
   {
-    id: "trend-tt-001",
+    id: "trend-sp-003",
     title: "Viral Mini Portable Fan — Rechargeable, 3-Speed, Foldable Desk Fan",
     price: 249,
     original_price: 399,
     currency: "PHP",
-    store_name: "TikTok Shop · GadgetHub PH",
-    platform: "tiktok",
+    store_name: "Shopee · GadgetHub PH",
+    platform: "shopee",
     image_url: "/demo/fan.svg",
-    product_url: "https://go.ecomobi.com/ph/tiktok/offer?product_id=TT-208841&campaign_id=ecm-ph-3312",
-    commission_rate: 8.5,
+    product_url: "https://shopee.ph/search?keyword=mini%20portable%20fan%20rechargeable",
+    commission_rate: 3.2,
     rating: 4.5,
     sold: 45000,
   },
@@ -103,13 +110,13 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "LazMall · Instant Home",
     platform: "lazada",
     image_url: "/demo/cooker.svg",
-    product_url: "https://go.ecomobi.com/ph/lazada/offer?product_id=LZ-990233&campaign_id=ecm-ph-1907",
-    commission_rate: 2.4,
+    product_url: "https://www.lazada.com.ph/catalog/?q=Instant%20Pot%20Duo%207-in-1",
+    commission_rate: 9.6,
     rating: 4.8,
     sold: 2100,
   },
   {
-    id: "trend-sp-003",
+    id: "trend-sp-004",
     title: "Nike Revolution 7 Men's Road Running Shoes — Lightweight & Breathable",
     price: 3095,
     original_price: 4295,
@@ -117,27 +124,27 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "Shopee · Nike Official",
     platform: "shopee",
     image_url: "/demo/shoes.svg",
-    product_url: "https://go.ecomobi.com/ph/shopee/offer?product_id=SP-448210&campaign_id=ecm-ph-2201",
-    commission_rate: 2.1,
+    product_url: "https://shopee.ph/search?keyword=Nike%20Revolution%207%20running%20shoes",
+    commission_rate: 3.2,
     rating: 4.7,
     sold: 6700,
   },
   {
-    id: "trend-tt-002",
+    id: "trend-lz-004",
     title: "Aesthetic Insulated Tumbler 20oz with Straw & Handle — Leak-Proof",
     price: 199,
     original_price: 299,
     currency: "PHP",
-    store_name: "TikTok Shop · CozySips",
-    platform: "tiktok",
+    store_name: "Lazada · CozySips",
+    platform: "lazada",
     image_url: "/demo/tumbler.svg",
-    product_url: "https://go.ecomobi.com/ph/tiktok/offer?product_id=TT-617305&campaign_id=ecm-ph-3312",
-    commission_rate: 12.0,
+    product_url: "https://www.lazada.com.ph/catalog/?q=insulated%20tumbler%2020oz%20straw",
+    commission_rate: 9.6,
     rating: 4.6,
     sold: 88000,
   },
   {
-    id: "trend-sp-004",
+    id: "trend-sp-005",
     title: "Baseus GaN5 Pro 65W Fast Charger — 3-Port USB-C PD Wall Charger",
     price: 1199,
     original_price: 1599,
@@ -145,13 +152,13 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "Shopee · Baseus Official",
     platform: "shopee",
     image_url: "/demo/charger.svg",
-    product_url: "https://go.ecomobi.com/ph/shopee/offer?product_id=SP-700115&campaign_id=ecm-ph-2201",
-    commission_rate: 4.8,
+    product_url: "https://shopee.ph/search?keyword=Baseus%2065W%20GaN%20fast%20charger",
+    commission_rate: 3.2,
     rating: 4.9,
     sold: 15600,
   },
   {
-    id: "trend-lz-004",
+    id: "trend-lz-005",
     title: "Lenovo IdeaPad Slim 3 15 — Intel Core i5-1235U, 16GB RAM, 512GB SSD",
     price: 32999,
     original_price: 39999,
@@ -159,8 +166,8 @@ export const TRENDING_PRODUCTS: Product[] = [
     store_name: "LazMall · Lenovo Official Store",
     platform: "lazada",
     image_url: "/demo/laptop.svg",
-    product_url: "https://go.ecomobi.com/ph/lazada/offer?product_id=LZ-400982&campaign_id=ecm-ph-1907",
-    commission_rate: 1.2,
+    product_url: "https://www.lazada.com.ph/catalog/?q=Lenovo%20IdeaPad%20Slim%203%20i5",
+    commission_rate: 9.6,
     rating: 4.5,
     sold: 980,
   },

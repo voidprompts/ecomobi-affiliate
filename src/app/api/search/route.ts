@@ -17,22 +17,28 @@
  *
  * ENVIRONMENT VARIABLES (defined in .env.local)
  *   ECOMOBI_API_TOKEN        REQUIRED. Publisher API token (Passio → API Settings)
- *   ECOMOBI_API_BASE_URL     Optional. Default: https://api.ecomobi.com
- *   ECOMOBI_SEARCH_ENDPOINT  Optional. Default: /v3/products/search
- *   ECOMOBI_AUTH_SCHEME      Optional. "bearer" (Authorization: Bearer <token>)
- *                            or "apikey" (X-API-Key: <token>). Default: bearer
+ *   ECOMOBI_API_BASE_URL     Optional. Default: https://api.ecotrackings.com
+ *                            (verified host of the Ecomobi/Passio publisher API)
+ *   ECOMOBI_SEARCH_ENDPOINT  Optional. Default: /api/v3/products
+ *   ECOMOBI_AUTH_SCHEME      Optional. "query" (default — token as a URL query
+ *                            parameter, per the Passio pub-API docs), "bearer"
+ *                            (Authorization: Bearer) or "apikey" (X-API-Key)
+ *   ECOMOBI_TOKEN_PARAM      Optional. Query-parameter name for the token when
+ *                            AUTH_SCHEME=query. Default: token
  *   DEMO_MODE                Optional. "auto" | "true" | "false". Default: auto
  *                            (auto = sample data only while no token is set)
  *   RATE_LIMIT_MAX           Optional. Searches per window per IP. Default: 30
  *   RATE_LIMIT_WINDOW_MS     Optional. Window length (ms). Default: 60000
  *
- * NOTE — Ecomobi's full API reference lives inside your publisher dashboard
- * (API Settings). If your account documents a different search path or auth
- * style, change ECOMOBI_SEARCH_ENDPOINT / ECOMOBI_AUTH_SCHEME in .env.local —
- * no code changes are required. The normalizer below also tolerates a wide
- * range of payload shapes (data/products/items containers and common field
- * aliases), so minor upstream schema drift degrades gracefully instead of
- * breaking the dashboard.
+ * NOTE — Verified upstream contract (Passio publisher API documentation,
+ * affiliate.passio.eco/pub-api-document): the API host is
+ * api.ecotrackings.com, endpoints live under /api/v3/*, authentication is a
+ * `token` (or `token_private`) URL query parameter, and some errors are
+ * returned as HTTP 200 with a JSON error body — both are handled below.
+ * If your account documents a different path or auth style, override it in
+ * .env.local — no code changes are required. The normalizer also tolerates a
+ * wide range of payload shapes (data/products/items containers and common
+ * field aliases), so minor upstream schema drift degrades gracefully.
  ******************************************************************************/
 
 import { NextRequest, NextResponse } from "next/server";
@@ -78,18 +84,28 @@ type SearchResponse = SearchSuccess | SearchFailure;
 const API_TOKEN = (process.env.ECOMOBI_API_TOKEN ?? "").trim();
 
 const API_BASE_URL = (
-  process.env.ECOMOBI_API_BASE_URL ?? "https://api.ecomobi.com"
+  process.env.ECOMOBI_API_BASE_URL ?? "https://api.ecotrackings.com"
 )
   .trim()
   .replace(/\/+$/, "");
 
 const SEARCH_ENDPOINT = (
-  process.env.ECOMOBI_SEARCH_ENDPOINT ?? "/v3/products/search"
+  process.env.ECOMOBI_SEARCH_ENDPOINT ?? "/api/v3/products"
 ).trim();
 
-const AUTH_SCHEME = (process.env.ECOMOBI_AUTH_SCHEME ?? "bearer")
+/**
+ * Auth transport for the upstream API:
+ *   "query"  → token as a URL query parameter (Passio publisher API style)
+ *   "bearer" → Authorization: Bearer <token>
+ *   "apikey" → X-API-Key: <token>
+ */
+const AUTH_SCHEME = (process.env.ECOMOBI_AUTH_SCHEME ?? "query")
   .trim()
   .toLowerCase();
+
+/** Query-parameter name used when AUTH_SCHEME === "query". */
+const TOKEN_QUERY_PARAM =
+  (process.env.ECOMOBI_TOKEN_PARAM ?? "token").trim() || "token";
 
 const DEMO_MODE = (process.env.DEMO_MODE ?? "auto").trim().toLowerCase();
 
@@ -365,9 +381,13 @@ async function parsePostRequest(request: NextRequest): Promise<PostBody> {
 /* ══════════════════════════════════════════════════════════════════════════
  * 6. ECOMOBI UPSTREAM CALL — authenticated fetch with method fallback
  *
- * Primary attempt is POST (JSON body, token in headers). If the endpoint
- * answers 405/415 (method not allowed / unsupported media type) the call is
- * retried once as GET with the same parameters in the query string.
+ * The verified Passio publisher API (api.ecotrackings.com) authenticates via
+ * a `token` URL query parameter and serves GET requests; some errors are
+ * returned as HTTP 200 with a JSON error body. The call therefore:
+ *   • sends the token as a query param (or header, per ECOMOBI_AUTH_SCHEME),
+ *   • tries GET first when using query auth (POST first otherwise),
+ *   • falls back to the other method on 405/415,
+ *   • inspects every "successful" body for an embedded error envelope.
  * ════════════════════════════════════════════════════════════════════════ */
 
 interface UpstreamProblem {
@@ -380,6 +400,57 @@ interface UpstreamProblem {
 type UpstreamResult =
   | { ok: true; payload: unknown }
   | { ok: false; problem: UpstreamProblem };
+
+/**
+ * Detect Ecomobi's JSON error envelopes. Their API sometimes answers
+ * HTTP 200 with a body like {"error":{"status_code":500,"messsage":"…"}}
+ * (note their "messsage" typo — both keys are read) or
+ * {"success":false,"message":"Not Found","status":404}.
+ */
+function detectPayloadError(payload: unknown): UpstreamProblem | null {
+  if (!isRecord(payload)) return null;
+
+  const nested = payload.error;
+  if (isRecord(nested)) {
+    const rawMessage =
+      typeof nested.message === "string"
+        ? nested.message
+        : typeof nested.messsage === "string"
+          ? nested.messsage
+          : "";
+    if (rawMessage !== "") {
+      return payloadProblemFromMessage(rawMessage);
+    }
+  }
+
+  if (payload.success === false) {
+    const message =
+      typeof payload.message === "string" && payload.message !== ""
+        ? payload.message
+        : "The Ecomobi API rejected the request.";
+    return payloadProblemFromMessage(message);
+  }
+
+  return null;
+}
+
+function payloadProblemFromMessage(message: string): UpstreamProblem {
+  const trimmed = message.toLowerCase();
+  if (trimmed.includes("token")) {
+    return {
+      httpStatus: 502,
+      code: "ECOMOBI_AUTH_FAILED",
+      message:
+        `Ecomobi rejected the API token ("${sanitizeSnippet(message)}"). Verify ECOMOBI_API_TOKEN in .env.local / Vercel — ` +
+        `copy the exact token value from your Passio dashboard → API Settings (no spaces, correct casing).`,
+    };
+  }
+  return {
+    httpStatus: 502,
+    code: "ECOMOBI_UPSTREAM_ERROR",
+    message: `Ecomobi returned an error: ${sanitizeSnippet(message)}`,
+  };
+}
 
 function mapUpstreamStatus(status: number, snippet: string): UpstreamProblem {
   if (status === 400) {
@@ -444,14 +515,11 @@ async function fetchEcomobiProducts(
 ): Promise<UpstreamResult> {
   const endpoint = `${API_BASE_URL}${SEARCH_ENDPOINT}`;
 
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  };
-  if (AUTH_SCHEME === "apikey") {
-    headers["X-API-Key"] = API_TOKEN;
-  } else {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (AUTH_SCHEME === "bearer") {
     headers["Authorization"] = `Bearer ${API_TOKEN}`;
+  } else if (AUTH_SCHEME === "apikey") {
+    headers["X-API-Key"] = API_TOKEN;
   }
 
   const query = new URLSearchParams({
@@ -460,6 +528,7 @@ async function fetchEcomobiProducts(
     limit: String(params.limit),
   });
   if (params.subId) query.set("sub_id", params.subId);
+  if (AUTH_SCHEME === "query") query.set(TOKEN_QUERY_PARAM, API_TOKEN);
 
   const requestBody = JSON.stringify({
     keyword: params.keyword,
@@ -468,14 +537,21 @@ async function fetchEcomobiProducts(
     limit: params.limit,
   });
 
-  for (const method of ["POST", "GET"] as const) {
+  // Query-param APIs (Passio style) are GET-first; header-auth APIs POST-first.
+  const methods: readonly ("GET" | "POST")[] =
+    AUTH_SCHEME === "query" ? ["GET", "POST"] : ["POST", "GET"];
+
+  for (const method of methods) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const url = method === "POST" ? endpoint : `${endpoint}?${query.toString()}`;
+      const url = method === "GET" ? `${endpoint}?${query.toString()}` : endpoint;
+      const requestHeaders: Record<string, string> = { ...headers };
+      if (method === "POST") requestHeaders["Content-Type"] = "application/json";
+
       const res = await fetch(url, {
         method,
-        headers,
+        headers: requestHeaders,
         body: method === "POST" ? requestBody : undefined,
         signal: controller.signal,
         cache: "no-store",
@@ -497,11 +573,22 @@ async function fetchEcomobiProducts(
             },
           };
         }
+        // Their API reports some failures as HTTP 200 + error body.
+        const embedded = detectPayloadError(payload);
+        if (embedded !== null) {
+          console.warn(
+            `[/api/search] Ecomobi error envelope on ${method} ${endpoint}: ${embedded.message}`,
+          );
+          return { ok: false, problem: embedded };
+        }
         return { ok: true, payload };
       }
 
-      // POST rejected for its method/media-type → retry once as GET.
-      if (method === "POST" && (res.status === 405 || res.status === 415)) {
+      // First method rejected for method/media-type → try the other once.
+      if (
+        method !== methods[methods.length - 1] &&
+        (res.status === 405 || res.status === 415)
+      ) {
         continue;
       }
 
@@ -535,13 +622,13 @@ async function fetchEcomobiProducts(
     }
   }
 
-  // Unreachable in practice (the GET attempt always returns), kept for safety.
+  // Unreachable in practice (the second attempt always returns), kept for safety.
   return {
     ok: false,
     problem: {
       httpStatus: 502,
       code: "ECOMOBI_METHOD_UNSUPPORTED",
-      message: "The Ecomobi endpoint rejected both POST and GET requests.",
+      message: "The Ecomobi endpoint rejected both GET and POST requests.",
     },
   };
 }
@@ -1033,7 +1120,10 @@ async function handleSearch(request: NextRequest): Promise<NextResponse> {
         products,
         ...(products.length === 0
           ? {
-              notice: `No products found for “${params.keyword}”. Try a different or broader keyword.`,
+              notice:
+                `No products found for “${params.keyword}”. Ecomobi's public API does not expose a product-search catalog for ` +
+                `all accounts — use the Instant Link Generator below to create tracked affiliate links for any product URL ` +
+                `from your approved stores (shopee.ph, lazada.com.ph, …).`,
             }
           : {}),
       },

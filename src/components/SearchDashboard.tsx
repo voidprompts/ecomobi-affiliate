@@ -37,8 +37,8 @@ import {
 import type { Platform, Product } from "@/lib/types";
 import {
   SUB_ID_PARAM,
+  SUB_ID_PARAM_NOTE,
   SUB_ID_PATTERN,
-  buildAffiliateLink,
   discountPercent,
   formatPrice,
   formatSold,
@@ -89,6 +89,13 @@ type SearchState =
       notice: string | null;
     }
   | { phase: "error"; message: string; code: string | null };
+
+/** Lifecycle of the real affiliate-link generation call in the modal. */
+type ModalLinkState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; link: string; resolved: string | null }
+  | { status: "error"; message: string; code: string };
 
 /* ══════════════════════════════════════════════════════════════════════════
  * 2. LOCAL CONSTANTS & PURE HELPERS
@@ -386,7 +393,7 @@ function EmptyState({ keyword, notice }: { keyword: string; notice: string | nul
 
 function LinkModal({
   product,
-  link,
+  linkState,
   subId,
   onSubIdChange,
   subIdError,
@@ -396,7 +403,7 @@ function LinkModal({
   onClose,
 }: {
   product: Product;
-  link: string;
+  linkState: ModalLinkState;
   subId: string;
   onSubIdChange: (value: string) => void;
   subIdError: string | null;
@@ -487,11 +494,11 @@ function LinkModal({
                 <span className="text-rose-400">{subIdError}</span>
               ) : (
                 <>
-                  Appended to your link as{" "}
+                  Sent through the Ecomobi tracking pipeline as{" "}
                   <code className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[11px] text-slate-300">
                     {SUB_ID_PARAM}
-                  </code>{" "}
-                  — Ecomobi attributes every conversion to this channel in your reports.
+                  </code>
+                  . {SUB_ID_PARAM_NOTE}
                 </>
               )}
             </p>
@@ -499,7 +506,7 @@ function LinkModal({
 
           <div>
             <p className="field-label">Your tracked affiliate link</p>
-            {link ? (
+            {linkState.status === "ready" ? (
               <div
                 role="button"
                 tabIndex={0}
@@ -512,13 +519,48 @@ function LinkModal({
                 }}
                 className="cursor-pointer select-all break-all rounded-xl bg-slate-950/70 p-3.5 font-mono text-xs leading-5 text-slate-300 ring-1 ring-white/10 transition hover:ring-white/25"
               >
-                {link}
+                {linkState.link}
+              </div>
+            ) : linkState.status === "loading" ? (
+              <div className="flex items-center gap-3 rounded-xl bg-slate-950/70 p-3.5 ring-1 ring-white/10">
+                <Spinner className="h-4 w-4 shrink-0 animate-spin text-indigo-400" />
+                <p className="text-xs leading-5 text-slate-400">
+                  Generating your tracked Ecomobi link…
+                </p>
+              </div>
+            ) : linkState.status === "error" ? (
+              <div className="rounded-xl bg-rose-500/10 p-3.5 ring-1 ring-rose-400/30">
+                <p className="text-xs leading-5 text-rose-300">{linkState.message}</p>
+                {product.product_url && (
+                  <p className="mt-2 break-all font-mono text-[10px] leading-4 text-slate-500">
+                    source URL: {product.product_url}
+                  </p>
+                )}
+              </div>
+            ) : subIdError ? (
+              <div className="rounded-xl bg-slate-950/70 p-3.5 text-xs leading-5 text-slate-400 ring-1 ring-white/10">
+                Fix the Sub-ID above to generate your tracked link.
               </div>
             ) : (
               <div className="rounded-xl bg-rose-500/10 p-3.5 text-xs leading-5 text-rose-300 ring-1 ring-rose-400/30">
-                No Ecomobi tracking link was returned for this product, so an affiliate
-                link cannot be generated.
+                No product URL was returned for this item, so an affiliate link cannot be
+                generated. Use the Instant Link Generator below with a URL copied from the
+                store.
               </div>
+            )}
+            {linkState.status === "ready" && linkState.resolved && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                Resolves through Ecomobi to{" "}
+                <span className="font-semibold text-slate-300">
+                  {(() => {
+                    try {
+                      return new URL(linkState.resolved).hostname;
+                    } catch {
+                      return "the store";
+                    }
+                  })()}
+                </span>
+              </p>
             )}
             {copyFailed && (
               <p className="mt-1.5 text-xs text-amber-400">
@@ -534,7 +576,7 @@ function LinkModal({
           <button
             type="button"
             onClick={onCopy}
-            disabled={!link}
+            disabled={linkState.status !== "ready"}
             className={`inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${
               copied
                 ? "bg-emerald-500 text-white hover:bg-emerald-400"
@@ -550,9 +592,9 @@ function LinkModal({
               </>
             )}
           </button>
-          {link && (
+          {linkState.status === "ready" && (
             <a
-              href={link}
+              href={linkState.link}
               target="_blank"
               rel="sponsored noopener noreferrer"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white/5 px-5 text-sm font-semibold text-slate-200 ring-1 ring-white/15 transition hover:bg-white/10"
@@ -583,6 +625,7 @@ export default function SearchDashboard() {
   const [platformFilter, setPlatformFilter] = useState<Platform | "all">("all");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [modalSubId, setModalSubId] = useState("");
+  const [modalLink, setModalLink] = useState<ModalLinkState>({ status: "idle" });
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
@@ -743,6 +786,7 @@ export default function SearchDashboard() {
   const closeModal = useCallback(() => {
     setActiveProduct(null);
     setModalSubId("");
+    setModalLink({ status: "idle" });
     setCopied(false);
     setCopyFailed(false);
     if (copyTimerRef.current !== null) {
@@ -763,11 +807,70 @@ export default function SearchDashboard() {
 
   const modalSubIdError = validateSubId(modalSubId);
 
-  const modalLink = useMemo(() => {
-    if (!activeProduct) return "";
-    const trimmed = modalSubId.trim();
-    const usable = trimmed !== "" && modalSubIdError === null ? trimmed : null;
-    return buildAffiliateLink(activeProduct.product_url, usable);
+  /* ── Real link generation (debounced while the Sub-ID is edited) ──── */
+  useEffect(() => {
+    if (!activeProduct || !activeProduct.product_url || modalSubIdError) {
+      setModalLink({ status: "idle" });
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setModalLink({ status: "loading" });
+      fetch("/api/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: activeProduct.product_url,
+          subId: modalSubId.trim() || undefined,
+        }),
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          const data: unknown = await response.json().catch(() => null);
+          if (
+            response.ok &&
+            typeof data === "object" &&
+            data !== null &&
+            (data as Record<string, unknown>).ok === true
+          ) {
+            const record = data as Record<string, unknown>;
+            setModalLink({
+              status: "ready",
+              link: typeof record.link === "string" ? record.link : "",
+              resolved: typeof record.resolved === "string" ? record.resolved : null,
+            });
+            return;
+          }
+          const maybeError =
+            typeof data === "object" && data !== null
+              ? (data as Record<string, unknown>).error
+              : null;
+          const err =
+            typeof maybeError === "object" && maybeError !== null
+              ? (maybeError as Record<string, unknown>)
+              : null;
+          setModalLink({
+            status: "error",
+            message:
+              typeof err?.message === "string"
+                ? err.message
+                : `The link service returned HTTP ${response.status}.`,
+            code: typeof err?.code === "string" ? err.code : "BAD_RESPONSE",
+          });
+        })
+        .catch((error: unknown) => {
+          if (error instanceof Error && error.name === "AbortError") return;
+          setModalLink({
+            status: "error",
+            message: "Could not reach the link service. Check your connection and try again.",
+            code: "NETWORK",
+          });
+        });
+    }, 400);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [activeProduct, modalSubId, modalSubIdError]);
 
   /* Close on Escape + lock body scroll while the modal is open. */
@@ -786,8 +889,8 @@ export default function SearchDashboard() {
   }, [activeProduct, closeModal]);
 
   const handleCopy = useCallback(async () => {
-    if (!modalLink) return;
-    const succeeded = await copyToClipboard(modalLink);
+    if (modalLink.status !== "ready") return;
+    const succeeded = await copyToClipboard(modalLink.link);
     setCopyFailed(!succeeded);
     if (succeeded) {
       setCopied(true);
@@ -1002,6 +1105,21 @@ export default function SearchDashboard() {
           </>
         )}
       </div>
+
+      {/* Modal wizard — real Ecomobi link generation */}
+      {activeProduct && (
+        <LinkModal
+          product={activeProduct}
+          linkState={modalLink}
+          subId={modalSubId}
+          onSubIdChange={setModalSubId}
+          subIdError={modalSubIdError}
+          copied={copied}
+          copyFailed={copyFailed}
+          onCopy={() => void handleCopy()}
+          onClose={closeModal}
+        />
+      )}
     </section>
   );
 }
