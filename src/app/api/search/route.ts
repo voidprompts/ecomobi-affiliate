@@ -1108,6 +1108,33 @@ async function handleSearch(request: NextRequest): Promise<NextResponse> {
 
     // ── 9.6 Normalize + respond ───────────────────────────────────────
     const products = normalizeProducts(upstream.payload);
+
+    // Live catalog came back empty (Ecomobi only serves product data to
+    // accounts with product feeds enabled). Fall back to the labeled sample
+    // catalog so the search experience stays useful, with a transparent
+    // notice directing users to the Instant Link Generator for real links.
+    if (products.length === 0) {
+      const { products: samples } = buildDemoProducts(params.keyword);
+      return json(
+        {
+          ok: true,
+          source: "demo",
+          keyword: params.keyword,
+          sub_id: params.subId,
+          page: 1,
+          limit: params.limit,
+          count: samples.length,
+          products: samples,
+          notice:
+            `Live product results aren't available — Ecomobi's API doesn't serve a product catalog for ` +
+            `your campaigns yet, so these are sample products for “${params.keyword}”. Use the tracked store ` +
+            `buttons above to open the real marketplace results, then paste any product URL into the Instant ` +
+            `Link Generator to create your affiliate link.`,
+        },
+        200,
+      );
+    }
+
     return json(
       {
         ok: true,
@@ -1118,14 +1145,6 @@ async function handleSearch(request: NextRequest): Promise<NextResponse> {
         limit: params.limit,
         count: products.length,
         products,
-        ...(products.length === 0
-          ? {
-              notice:
-                `No products found for “${params.keyword}”. Ecomobi's public API does not expose a product-search catalog for ` +
-                `all accounts — use the Instant Link Generator below to create tracked affiliate links for any product URL ` +
-                `from your approved stores (shopee.ph, lazada.com.ph, …).`,
-            }
-          : {}),
       },
       200,
     );

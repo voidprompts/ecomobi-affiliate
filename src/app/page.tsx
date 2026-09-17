@@ -116,20 +116,20 @@ const WORKFLOW_STEPS = [
   {
     step: "01",
     icon: "search",
-    title: "Find the product",
-    text: "Browse the trending deals grid or paste any product URL from Shopee PH, Lazada PH and your other approved Ecomobi campaign stores.",
+    title: "Search & open real results",
+    text: "Type any keyword and tap Shopee or Lazada — the dashboard opens the store's live search results with your Ecomobi affiliate tracking already attached to the click.",
   },
   {
     step: "02",
     icon: "tag",
-    title: "Generate a tracked link",
-    text: "The dashboard routes the URL through the Ecomobi Dynamic Link service (goeco.mobi) with your channel Sub-ID attached — fb-reels, tiktok-bio, youtube-07 — in one click.",
+    title: "Pick a product, tag your channel",
+    text: "Choose a product in the store, copy its link, and paste it into the Instant Link Generator with your Sub-ID channel label — fb-reels, tiktok-bio, youtube-07.",
   },
   {
     step: "03",
     icon: "bolt",
     title: "Share and earn commissions",
-    text: "Publish your affiliate links anywhere. Shoppers land on the store with your publisher tracking attached, and every order is credited in your Ecomobi conversion reports.",
+    text: "Share your tracked link anywhere. Shoppers land on the product with your publisher tracking attached, and every order is credited in your Ecomobi reports.",
   },
 ] as const;
 

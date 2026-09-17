@@ -39,12 +39,18 @@ import {
   SUB_ID_PARAM,
   SUB_ID_PARAM_NOTE,
   SUB_ID_PATTERN,
+  buildTrackedProxyHref,
   discountPercent,
   formatPrice,
   formatSold,
   PLATFORM_META,
   validateSubId,
 } from "@/lib/format";
+import {
+  DEFAULT_SEARCH_CHANNEL,
+  MARKETPLACES,
+  type MarketplaceDef,
+} from "@/lib/marketplaces";
 import {
   AlertIcon,
   CopyIcon,
@@ -614,6 +620,95 @@ function LinkModal({
   );
 }
 
+/**
+ * Tracked deep-search panel — the real path from keyword to product.
+ * Each button is an affiliate-tracked click (via /api/go → goeco.mobi) that
+ * opens the marketplace's live search results for the keyword, dropping the
+ * publisher's affiliate cookie on the store domain.
+ */
+function MarketplaceSearchPanel({
+  keyword,
+  channel,
+}: {
+  keyword: string;
+  channel: string;
+}) {
+  return (
+    <div className="animate-rise-in rounded-2xl border border-indigo-400/25 bg-indigo-500/5 p-4 ring-1 ring-indigo-400/10 sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-bold text-white">
+          Open the real search results — your clicks are tracked
+        </h3>
+        <p className="text-[11px] font-medium text-indigo-300/80">
+          affiliate cookie drops instantly
+        </p>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-slate-400">
+        Tap a store to open its live results for{" "}
+        <span className="font-semibold text-slate-200">“{keyword}”</span> with your
+        Ecomobi tracking attached. Pick any product, copy its link, then paste it
+        into the{" "}
+        <a href="#generator" className="font-semibold text-indigo-300 underline-offset-2 hover:underline">
+          Instant Link Generator
+        </a>{" "}
+        to create your shareable affiliate link.
+      </p>
+
+      <div className="mt-3.5 grid gap-2.5 sm:grid-cols-3">
+        {MARKETPLACES.map((marketplace) => (
+          <MarketplaceSearchButton
+            key={marketplace.id}
+            marketplace={marketplace}
+            keyword={keyword}
+            channel={channel}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MarketplaceSearchButton({
+  marketplace,
+  keyword,
+  channel,
+}: {
+  marketplace: MarketplaceDef;
+  keyword: string;
+  channel: string;
+}) {
+  if (!marketplace.enabled) {
+    return (
+      <span
+        title={marketplace.disabledNote}
+        aria-disabled="true"
+        className="inline-flex h-12 cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-white/5 text-sm font-semibold text-slate-500 ring-1 ring-white/10"
+      >
+        {marketplace.name}
+        <span className="text-[10px] font-medium uppercase tracking-wide text-slate-600">
+          soon
+        </span>
+      </span>
+    );
+  }
+  return (
+    <a
+      href={buildTrackedProxyHref(marketplace.searchUrl(keyword), channel)}
+      target="_blank"
+      rel="sponsored noopener noreferrer"
+      className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition active:scale-[0.98] ${marketplace.buttonClass}`}
+    >
+      <SearchIcon className="h-4 w-4" />
+      {marketplace.name}
+      {marketplace.commission && (
+        <span className="rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] font-bold">
+          {marketplace.commission}
+        </span>
+      )}
+    </a>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
  * 4. DASHBOARD — state orchestration
  * ════════════════════════════════════════════════════════════════════════ */
@@ -1032,6 +1127,16 @@ export default function SearchDashboard() {
 
         {search.phase === "success" && (
           <>
+            {/* Tracked deep-search — the real keyword → product → commission flow */}
+            <MarketplaceSearchPanel
+              keyword={search.keyword}
+              channel={
+                subIdTrimmed !== "" && subIdError === null
+                  ? subIdTrimmed
+                  : DEFAULT_SEARCH_CHANNEL
+              }
+            />
+
             {search.source === "demo" && search.notice && (
               <div className="flex items-start gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
                 <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
