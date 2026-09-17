@@ -44,6 +44,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Platform, Product } from "@/lib/types";
 import { TRENDING_PRODUCTS } from "@/lib/trending-products";
+import { isApifyConfigured, searchMarketplaces } from "@/lib/apify";
 
 export type { Platform, Product };
 /** Uniform product shape shared with the UI — single source of truth. */
@@ -60,7 +61,7 @@ export const dynamic = "force-dynamic";
 
 interface SearchSuccess {
   ok: true;
-  source: "ecomobi" | "demo";
+  source: "ecomobi" | "demo" | "marketplace";
   keyword: string;
   sub_id: string | null;
   page: number;
@@ -1087,6 +1088,58 @@ async function handleSearch(request: NextRequest): Promise<NextResponse> {
         },
         200,
       );
+    }
+
+    // ── 9.4b LIVE MARKETPLACE SEARCH (Apify actors — real in-site results) ─
+    // Activates when APIFY_TOKEN is set. On success the dashboard renders a
+    // real product grid inside the site (no external prompting); each card's
+    // Generate Link converts the real product URL into a tracked goeco.mobi
+    // affiliate link. Failures degrade gracefully to the Ecomobi path below.
+    if (isApifyConfigured()) {
+      const market = await searchMarketplaces(params.keyword, params.limit);
+      if (market.products.length > 0) {
+        return json(
+          {
+            ok: true,
+            source: "marketplace",
+            keyword: params.keyword,
+            sub_id: params.subId,
+            page: 1,
+            limit: params.limit,
+            count: market.products.length,
+            products: market.products,
+            notice:
+              "Live marketplace results via Apify — prices and stock update when the store's page changes. Generate Link creates your tracked Ecomobi affiliate URL for any product.",
+          },
+          200,
+        );
+      }
+      if (market.mockOnly) {
+        const { products: samples } = buildDemoProducts(params.keyword);
+        return json(
+          {
+            ok: true,
+            source: "demo",
+            keyword: params.keyword,
+            sub_id: params.subId,
+            page: 1,
+            limit: params.limit,
+            count: samples.length,
+            products: samples,
+            notice:
+              "Your Apify plan returned MOCK data (some actors — including the default Shopee scraper — " +
+              "only serve live results on paid Apify plans). Showing sample products instead. Upgrade your " +
+              "Apify plan or pick a free-tier actor from the ecommerce-intelligence-apis catalog.",
+          },
+          200,
+        );
+      }
+      if (market.warnings.length > 0) {
+        console.warn(
+          `[/api/search] Apify providers degraded for "${params.keyword}": ${market.warnings.join(" | ")}`,
+        );
+      }
+      // Empty/error → fall through to the Ecomobi product endpoint.
     }
 
     // ── 9.5 Live Ecomobi search ───────────────────────────────────────

@@ -71,7 +71,7 @@ import {
 
 interface SearchSuccessPayload {
   ok: true;
-  source: "ecomobi" | "demo";
+  source: "ecomobi" | "demo" | "marketplace";
   keyword: string;
   sub_id: string | null;
   count: number;
@@ -90,7 +90,7 @@ type SearchState =
   | {
       phase: "success";
       products: Product[];
-      source: "ecomobi" | "demo";
+      source: "ecomobi" | "demo" | "marketplace";
       keyword: string;
       notice: string | null;
     }
@@ -147,7 +147,9 @@ function isProduct(value: unknown): value is Product {
 function isSearchSuccess(value: unknown): value is SearchSuccessPayload {
   if (!isRecord(value) || value.ok !== true) return false;
   if (typeof value.keyword !== "string") return false;
-  if (value.source !== "ecomobi" && value.source !== "demo") return false;
+  if (value.source !== "ecomobi" && value.source !== "demo" && value.source !== "marketplace") {
+    return false;
+  }
   return Array.isArray(value.products) && value.products.every(isProduct);
 }
 
@@ -795,7 +797,7 @@ export default function SearchDashboard() {
 
     try {
       const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 30_000);
+      const timeout = window.setTimeout(() => controller.abort(), 60_000);
       let response: Response;
       try {
         response = await fetch("/api/search", {
@@ -1137,8 +1139,12 @@ export default function SearchDashboard() {
               }
             />
 
-            {search.source === "demo" && search.notice && (
-              <div className="flex items-start gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+            {search.notice && search.products.length > 0 && (
+              <div className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
+                search.source === "marketplace"
+                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+                  : "border-amber-400/25 bg-amber-400/10 text-amber-200"
+              }`}>
                 <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>{search.notice}</p>
               </div>
@@ -1148,18 +1154,29 @@ export default function SearchDashboard() {
               <EmptyState keyword={search.keyword} notice={search.notice} />
             ) : (
               <>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-slate-400">
-                    <span className="font-bold text-white">{visibleProducts.length}</span>{" "}
-                    {visibleProducts.length === 1 ? "product" : "products"} for{" "}
-                    <span className="font-semibold text-slate-200">“{search.keyword}”</span>
-                    {subIdTrimmed !== "" && subIdError === null && (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-300 ring-1 ring-violet-400/30">
-                        <TagIcon className="h-3 w-3" />
-                        <span className="font-mono">{subIdTrimmed}</span>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
+                      <span>
+                        <span className="font-bold text-white">{visibleProducts.length}</span>{" "}
+                        {visibleProducts.length === 1 ? "product" : "products"} for{" "}
+                        <span className="font-semibold text-slate-200">“{search.keyword}”</span>
                       </span>
-                    )}
-                  </p>
+                      {search.source === "marketplace" && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-400/30">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          </span>
+                          Live results
+                        </span>
+                      )}
+                      {subIdTrimmed !== "" && subIdError === null && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-300 ring-1 ring-violet-400/30">
+                          <TagIcon className="h-3 w-3" />
+                          <span className="font-mono">{subIdTrimmed}</span>
+                        </span>
+                      )}
+                    </p>
                   <div className="flex flex-wrap gap-2" role="group" aria-label="Filter results by platform">
                     <button
                       type="button"

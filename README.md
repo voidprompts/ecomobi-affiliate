@@ -13,7 +13,7 @@ configuration**.
 | **Instant Link Generator** | ✅ LIVE | Paste any product URL from an approved store → real `goeco.mobi` tracked affiliate link with your Sub-ID channel (`sub1`), validated through the Ecomobi Dynamic Link service |
 | **Campaign list** | ✅ LIVE | All **78 approved advertisers** from your account (Lazada PH 9.6%, Shopee PH 3.2%, Adidas PH, Shein 12%, …) with commission rates |
 | **Tracked trending grid** | ✅ LIVE | Every "View Deal" click routes through `/api/go` → `goeco.mobi` with server-side token injection and the `web-trending` channel Sub-ID |
-| **Product search** | ⚠️ Sample data | Ecomobi's public API has **no product-search catalog** (the `/api/v3/products` endpoint exists but returns an empty dataset until product feeds are enabled for your campaigns). The search UI serves a clearly-labeled sample catalog and live-empty results include guidance to the generator |
+| **Product search** | ✅ with Apify | Set `APIFY_TOKEN` and search returns **real Shopee/Lazada products rendered inside the site** (grids, prices, images, "Generate Link" on every card). Actors come from the [ecommerce-intelligence-apis](https://github.com/cporter202/ecommerce-intelligence-apis) catalog. Without a token, a labeled sample catalog + tracked deep-search buttons are served |
 | **Conversions reporting** | 🔜 Roadmap | The documented `/api/v3/conversions` endpoint (token_private, ≤90-day ranges) is available but intentionally not exposed in the UI |
 
 **Verified live behavior:** `shopee.ph/product/…` → `s.shopee.ph/an_redir?…affiliate_id=13248560000…`,
@@ -164,6 +164,48 @@ the uniform product schema (`title`, `price`, `store_name`, `image_url`,
 | `GET goeco.mobi/?token=…&url=…&sub1=…` | `token` | Dynamic Link — the constructed URL is the shareable tracked link; errors return as `302 → /error?err_code=…` (`empty_url`, `empty_advertiser`, `campaign_not_running`, `publisher_not_found`, …) |
 
 ---
+
+## Live product search inside the site (Apify)
+
+Ecomobi's API doesn't expose a product catalog, and the marketplaces block
+product-listing requests from server IPs. The production-grade solution is the
+**Apify actor layer** — actors curated in the
+[ecommerce-intelligence-apis](https://github.com/cporter202/ecommerce-intelligence-apis)
+directory (2,245 ecommerce actors):
+
+```
+User searches "wireless earbuds"
+  -> /api/search runs your Apify actors in parallel (10-min result cache)
+  -> REAL Shopee + Lazada products render inside the dashboard grid
+  -> user clicks Generate Link -> real product URL -> goeco.mobi tracked
+     affiliate link -> share -> earn commissions
+```
+
+**Setup (5 minutes):**
+
+1. Create a free account at [apify.com](https://apify.com) -> **Settings ->
+   API & Integration** -> copy your personal token.
+2. Set `APIFY_TOKEN` in `.env.local` / Vercel. Done — the defaults use
+   verified actors:
+   - `gio21/shopee-scraper` (46k+ runs, supports PH via `country: "PH"`)
+   - `fatihtahta/lazada-scraper` (17k+ runs)
+3. Search anything — results now render inside the site with a pulsing
+   **"Live results"** badge.
+
+**Costs (verified from the actors' pricing pages):** the default Shopee actor
+charges ~$5 per 1,000 products and **requires a paid Apify plan** (Starter
+$49/mo includes ~10,000 products). On free plans some actors return clearly
+labelled `_mock` records — the dashboard detects them, filters them out, and
+tells you to upgrade or pick a free-tier actor from the catalog. Results are
+cached 10 minutes to conserve credits.
+
+**Swapping actors:** browse the
+[catalog](https://github.com/cporter202/ecommerce-intelligence-apis) or the
+[Apify store](https://apify.com/store), then set `APIFY_SHOPEE_ACTOR` /
+`APIFY_LAZADA_ACTOR`. If your actor expects different input fields, copy its
+Input-tab JSON into `APIFY_INPUT_TEMPLATE` using `{keyword}` and `{limit}`
+placeholders. Attribution note: the catalog repo preserves Apify referral
+links — using any actor is between you and Apify's terms/pricing.
 
 ## Deploying to Vercel (zero configuration)
 
